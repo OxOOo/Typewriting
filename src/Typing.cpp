@@ -74,10 +74,8 @@ Typing::~Typing()
 
 void Typing::Init()
 {
-    words = getWords();
-    pinyin2words = getPinyin2Words(words);
-    ci_set = getCi(words);
-    cout << "ci_set.size() " << ci_set.size() << endl;
+    letters = getLetters();
+    pinyin2letters = getPinyin2Letters(letters);
 
     wordscount.resize(1);
     for(int q = 1; q <= Q; q ++)
@@ -88,7 +86,7 @@ void Typing::Init()
             auto count = loadWordCount(buf);
             wordscount.push_back(count);
         } else {
-            auto count = getWordCount(words, q);
+            auto count = getWordCount(letters, q);
             saveWordCount(count, buf);
             wordscount.push_back(count);
         }
@@ -139,9 +137,8 @@ double Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring
     from.resize(pinyins.size());
     for(int i = 0; i < (int)pinyins.size(); i ++)
     {
-        if (pinyin2words.find(pinyins[i]) == pinyin2words.end()) wcout << L"assert fail " << pinyins[i] << endl;
-        assert(pinyin2words.find(pinyins[i]) != pinyin2words.end());
-        choice[i] = pinyin2words.at(pinyins[i]);
+        assert(pinyin2letters.find(pinyins[i]) != pinyin2letters.end());
+        choice[i] = pinyin2letters.at(pinyins[i]);
         DP[i].resize(choice[i].size());
         from[i].resize(choice[i].size());
         assert(choice[i].size() > 0);
@@ -221,38 +218,10 @@ double Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring
     return max_score;
 }
 
-map<wstring, vector<wstring> > Typing::getPinyin2Words(const std::set<wchar_t>& words)
+set<wchar_t> Typing::getLetters()
 {
-    map<wstring, vector<wstring> > pinyin2words;
-    wifstream file(DATA_PATH + "dict.txt");
-    file.imbue(coding);
-
-    wstring line;
-    while(!file.eof())
-    {
-        getline(file, line);
-
-        wistringstream ss(line);
-        wstring pinyin, word;
-        vector<wstring> word_list;
-
-        ss >> pinyin;
-        if (pinyin.length() == 0) continue;
-        while(ss >> word) {
-            if (word.length() != 1 || words.find(word[0]) == words.end()) continue;
-            word_list.push_back(word);
-        }
-        transform(pinyin.begin(), pinyin.end(), pinyin.begin(), ::tolower);
-        pinyin2words[pinyin] = word_list;
-    }
-
-    return pinyin2words;
-}
-
-set<wchar_t> Typing::getWords()
-{
-    set<wchar_t> words;
-    wifstream file(DATA_PATH + "word_list.txt");
+    set<wchar_t> letters;
+    wifstream file(DATA_PATH + "letter_list.txt");
     file.imbue(coding);
 
     wstring line;
@@ -262,16 +231,16 @@ set<wchar_t> Typing::getWords()
 
         for(int i = 0; i < (int)line.length(); i ++)
             if (!iswspace(line[i]))
-                words.insert(line[i]);
+                letters.insert(line[i]);
     }
 
-    return words;
+    return letters;
 }
 
-std::set<std::wstring> Typing::getCi(const set<wchar_t>& words)
+map<wstring, vector<wstring> > Typing::getPinyin2Letters(const std::set<wchar_t>& letters)
 {
-    set<wstring> ci;
-    wifstream file(DATA_PATH + "ci.txt");
+    map<wstring, vector<wstring> > pinyin2letters;
+    wifstream file(DATA_PATH + "dict.txt");
     file.imbue(coding);
 
     wstring line;
@@ -280,25 +249,24 @@ std::set<std::wstring> Typing::getCi(const set<wchar_t>& words)
         getline(file, line);
 
         wistringstream ss(line);
-        wstring entry;
-        while(ss >> entry)
-        {
-            bool flag = true;
-            for(int i = 0; i < (int)entry.length() && flag; i ++)
-                if(words.find(entry[i]) == words.end())
-                    flag = false;
-            if (flag) ci.insert(entry);
+        wstring pinyin, letter;
+        vector<wstring> letter_list;
+
+        ss >> pinyin;
+        if (pinyin.length() == 0) continue;
+        while(ss >> letter) {
+            if (letter.length() != 1 || letters.find(letter[0]) == letters.end()) continue;
+            letter_list.push_back(letter);
         }
+        transform(pinyin.begin(), pinyin.end(), pinyin.begin(), ::tolower);
+        pinyin2letters[pinyin] = letter_list;
     }
 
-    return ci;
+    return pinyin2letters;
 }
 
-std::vector<std::pair<std::wstring, int> > Typing::getWordCount(const set<wchar_t>& words, int p)
+std::vector<std::pair<std::wstring, LL> > Typing::getWordCount(const set<wchar_t>& letters, int p)
 {
-    double filter = 1.0;
-    for(int x = 1; x < p; x ++) filter *= FILTER;
-
     wifstream file(DATA_PATH + "news.txt");
     file.imbue(coding);
 
@@ -314,7 +282,7 @@ std::vector<std::pair<std::wstring, int> > Typing::getWordCount(const set<wchar_
     cout << "total lines : " << lines.size() << endl;
 
     thread threads[THREADS];
-    map<wstring, int> temp_rst[THREADS];
+    map<wstring, LL> temp_rst[THREADS];
     vector<int> rangeS, rangeT;
     splitRange(0, lines.size(), THREADS, rangeS, rangeT);
     for(int k = 0; k < THREADS; k ++)
@@ -331,7 +299,7 @@ std::vector<std::pair<std::wstring, int> > Typing::getWordCount(const set<wchar_
 
                 for(int pos = 0; pos < (int)line.length(); pos ++)
                 {
-                    isok[pos] = (words.find(line[pos]) != words.end());
+                    isok[pos] = (letters.find(line[pos]) != letters.end());
                 }
 
                 for(int pos = 0; pos < (int)line.length(); pos ++)
@@ -359,7 +327,7 @@ std::vector<std::pair<std::wstring, int> > Typing::getWordCount(const set<wchar_
     }
     cout << "end threads " << endl;
 
-    map<wstring, int> rst;
+    map<wstring, LL> rst;
     for(int k = 0; k < THREADS; k ++)
     {
         for(auto p: temp_rst[k])
@@ -370,24 +338,16 @@ std::vector<std::pair<std::wstring, int> > Typing::getWordCount(const set<wchar_
         }
     }
 
-    vector<pair<int, wstring> > reversed_list;
+    vector<pair<wstring, LL> > count;
     for(auto p: rst)
     {
-        reversed_list.push_back(make_pair(p.second, p.first));
+        count.push_back(make_pair(p.first, p.second));
     }
-    sort(reversed_list.begin(), reversed_list.end(), greater<pair<int, wstring>>());
-
-    vector<pair<wstring, int> > count;
-    for(int i = 0, j = reversed_list.size()*filter+1e-5; i < j; i ++)
-    {
-        count.push_back(make_pair(reversed_list[i].second, reversed_list[i].first));
-    }
-    sort(count.begin(), count.end());
 
     return count;
 }
 
-void Typing::saveWordCount(const std::vector<std::pair<std::wstring, int> >& word_count, const string& filename)
+void Typing::saveWordCount(const std::vector<std::pair<std::wstring, LL> >& word_count, const string& filename)
 {
     wofstream file(DATA_PATH + filename);
     file.imbue(coding);
@@ -396,7 +356,7 @@ void Typing::saveWordCount(const std::vector<std::pair<std::wstring, int> >& wor
         file << p.first << L" " << p.second << endl;
 }
 
-std::vector<std::pair<std::wstring, int> > Typing::loadWordCount(const string& filename)
+std::vector<std::pair<std::wstring, LL> > Typing::loadWordCount(const string& filename)
 {
     wifstream file(DATA_PATH + filename);
     file.imbue(coding);
@@ -411,7 +371,7 @@ std::vector<std::pair<std::wstring, int> > Typing::loadWordCount(const string& f
     }
 
     thread threads[THREADS];
-    vector<pair<wstring, int> > temp_list[THREADS];
+    vector<pair<wstring, LL> > temp_list[THREADS];
     vector<int> rangeS, rangeT;
     splitRange(0, lines.size(), THREADS, rangeS, rangeT);
 
@@ -429,7 +389,7 @@ std::vector<std::pair<std::wstring, int> > Typing::loadWordCount(const string& f
 
                 wistringstream ss(line);
                 wstring gram;
-                int count;
+                LL count;
                 ss >> gram >> count;
 
                 temp_list[range_index].push_back(make_pair(gram, count));
@@ -444,7 +404,7 @@ std::vector<std::pair<std::wstring, int> > Typing::loadWordCount(const string& f
     }
     cout << "thread end" << endl;
 
-    vector<pair<wstring, int> > list;
+    vector<pair<wstring, LL> > list;
     list.reserve(lines.size());
     for(int i = 0; i < THREADS; i ++)
     {
@@ -466,7 +426,7 @@ bool Typing::isFileExists(const std::string& filename)
 
 int Typing::C(const std::wstring& X) const
 {
-    auto x = lower_bound(wordscount[X.length()].begin(), wordscount[X.length()].end(), make_pair(X, 0));
+    auto x = lower_bound(wordscount[X.length()].begin(), wordscount[X.length()].end(), make_pair(X, LL(0)));
     if (x->first != X) return 0;
     return x->second;
 }

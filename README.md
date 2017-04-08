@@ -13,3 +13,8 @@ typing.Solve : 274.336 s
 1-gram sina-only 8-threads build TimePoint(typing.Init):43.3786 s
 
 3-gram sina-only load typing.Init : 25.1356 s
+
+words correct : 82.4021 | 7177
+lines correct : 38.0519 | 770
+typing.Init : 18.0586 s
+typing.Solve : 48.4291 s
