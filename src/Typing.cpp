@@ -97,14 +97,12 @@ void Typing::Init()
             return x.second > 10;
         });
         wordscount[2].resize(std::distance(wordscount[2].begin(),it));
-        cout << "wordscount[2].size() " << wordscount[2].size() << " " << wordscount[2][0].second << endl;
     }
     if (Q >= 3) {
         auto it = copy_if(wordscount[3].begin(), wordscount[3].end(), wordscount[3].begin(), [](pair<wstring, int> x) {
             return x.second > 10;
         });
         wordscount[3].resize(std::distance(wordscount[3].begin(),it));
-        cout << "wordscount[3].size() " << wordscount[3].size() << " " << wordscount[3][0].second << endl;
     }
 
     total_database_words = 0;
@@ -121,77 +119,76 @@ void Typing::Check()
     if (Q >= 3) assert(1710 <= C(L"一一个"));
 }
 
-double Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring>& solution) const
+bool Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring>& solution) const
 {
     solution.clear();
     for(int i = 0; i < (int)pinyins.size(); i ++)
         transform(pinyins[i].begin(), pinyins[i].end(), pinyins[i].begin(), ::tolower);
+    if (pinyins.size() == 0) return false;
 
     vector<vector<wstring> > choice;
     vector<vector<double> > DP;
     vector<vector<int> > from;
 
-    assert(pinyins.size() > 0);
     choice.resize(pinyins.size());
     DP.resize(pinyins.size());
     from.resize(pinyins.size());
     for(int i = 0; i < (int)pinyins.size(); i ++)
     {
-        assert(pinyin2letters.find(pinyins[i]) != pinyin2letters.end());
+        if (pinyin2letters.find(pinyins[i]) == pinyin2letters.end() || pinyin2letters.at(pinyins[i]).size() == 0) return false;
         choice[i] = pinyin2letters.at(pinyins[i]);
         DP[i].resize(choice[i].size());
         from[i].resize(choice[i].size());
-        assert(choice[i].size() > 0);
     }
 
     for(int i = 0; i < (int)choice.size(); i ++)
     {
-        vector<int> sizes;
-        vector<vector<int> > indexes;
-
-        const int S = max(0, i-Q+1);
-        const int T = i-1;
-
-        for(int k = S; k <= T; k ++)
-            sizes.push_back(choice[k].size());
-        possibleList(sizes.size(), sizes, indexes);
-
         for(int j = 0; j < (int)choice[i].size(); j ++)
         {
             DP[i][j] = 0;
             from[i][j] = 0;
-            if (i == 0) DP[i][j] = C(choice[i][j]);
+            if (i == 0) DP[i][j] = C(choice[i][j])*lamda*lamda;
             else {
-                for(int p = 0; p < (int)indexes.size(); p ++)
+                for(int S = max(0, i-Q+1), T = i-1; S <= T; S++)
                 {
-                    double sum = 1.0;
-                    double P = 0;
+                    vector<int> sizes;
+                    vector<vector<int> > indexes;
 
-                    for(int k1 = S; k1 <= T; k1 ++)
+                    for(int k = S; k <= T; k ++)
+                        sizes.push_back(choice[k].size());
+                    possibleList(sizes.size(), sizes, indexes);
+
+                    for(int p = 0; p < (int)indexes.size(); p ++)
                     {
-                        wstring gram;
-                        for(int k = k1; k <= T; k ++)
+                        double sum = 1.0;
+                        double P = 0;
+
+                        for(int k1 = S; k1 <= T; k1 ++)
                         {
-                            gram += choice[k][indexes[p][k-S]];
+                            wstring gram;
+                            for(int k = k1; k <= T; k ++)
+                            {
+                                gram += choice[k][indexes[p][k-S]];
+                            }
+                            P += Pw(gram+choice[i][j], gram)*lamda*sum;
+                            sum *= 1-lamda;
                         }
-                        P += Pw(gram+choice[i][j], gram)*lamda*sum;
-                        sum *= 1-lamda;
+                        P += C(choice[i][j])*sum/double(total_database_words);
 
-                        // if (ci_set.find(gram + choice[i][j]) != ci_set.end()) P += C(gram + choice[i][j])/double();
-                    }
-                    P += C(choice[i][j])*sum/double(total_database_words);
+                        // FIXME 只取了最后一个
+                        for(int k = T; k <= T; k ++)
+                        {
+                            P *= DP[k][indexes[p][k-S]];
+                        }
 
-                    // FIXME 只取了最后一个
-                    for(int k = T; k <= T; k ++)
-                    {
-                        P *= DP[k][indexes[p][k-S]];
+                        if (DP[i][j] < P)
+                        {
+                            DP[i][j] = P;
+                            from[i][j] = indexes[p][sizes.size()-1];
+                        }
                     }
 
-                    if (DP[i][j] < P)
-                    {
-                        DP[i][j] = P;
-                        from[i][j] = indexes[p][sizes.size()-1];
-                    }
+                    break;
                 }
             }
         }
@@ -206,7 +203,7 @@ double Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring
             max_score = DP[choice.size()-1][j];
             pos = j;
         }
-    assert(pos >= 0);
+    if (pos < 0) return false;
     
     for(int i = choice.size()-1; i >= 0; i --)
     {
@@ -215,7 +212,7 @@ double Typing::Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring
     }
     reverse(solution.begin(), solution.end());
 
-    return max_score;
+    return true;
 }
 
 set<wchar_t> Typing::getLetters()
@@ -270,7 +267,6 @@ std::vector<std::pair<std::wstring, LL> > Typing::getWordCount(const set<wchar_t
     wifstream file(DATA_PATH + "news.txt");
     file.imbue(coding);
 
-    cout << "getWordCount " << p << endl;
     vector<wstring> lines;
     while(!file.eof())
     {
@@ -279,20 +275,20 @@ std::vector<std::pair<std::wstring, LL> > Typing::getWordCount(const set<wchar_t
         lines.push_back(line);
     }
 
-    cout << "total lines : " << lines.size() << endl;
-
     thread threads[THREADS];
     map<wstring, LL> temp_rst[THREADS];
-    vector<int> rangeS, rangeT;
-    splitRange(0, lines.size(), THREADS, rangeS, rangeT);
+    int id = 0;
+    mutex mut;
     for(int k = 0; k < THREADS; k ++)
     {
         threads[k] = thread([&](int range_index) {
-            const int S = rangeS[range_index], T = rangeT[range_index];
-            cout << "thread " << range_index << " " << S << " " << T << endl;
-
-            for(int index = S; index < T; index ++)
+            while(true)
             {
+                mut.lock();
+                int index = id ++;
+                mut.unlock();
+                if (index >= (int)lines.size()) break;
+
                 wstring line = lines[index];
                 vector<bool> isok;
                 isok.resize(line.length());
@@ -319,13 +315,13 @@ std::vector<std::pair<std::wstring, LL> > Typing::getWordCount(const set<wchar_t
                 }
             }
         }, k);
-        cout << "start threads " << k << endl;
     }
     for(int k = 0; k < THREADS; k ++)
     {
         threads[k].join();
     }
-    cout << "end threads " << endl;
+
+    lines = vector<wstring>();
 
     map<wstring, LL> rst;
     for(int k = 0; k < THREADS; k ++)
@@ -336,6 +332,7 @@ std::vector<std::pair<std::wstring, LL> > Typing::getWordCount(const set<wchar_t
                 rst[p.first] = p.second;
             else rst[p.first] += p.second;
         }
+        temp_rst[k] = map<wstring, LL>();
     }
 
     vector<pair<wstring, LL> > count;
@@ -396,13 +393,11 @@ std::vector<std::pair<std::wstring, LL> > Typing::loadWordCount(const string& fi
             }
 
         }, k);
-        cout << "start threads " << k << endl;
     }
     for(int k = 0; k < THREADS; k ++)
     {
         threads[k].join();
     }
-    cout << "thread end" << endl;
 
     vector<pair<wstring, LL> > list;
     list.reserve(lines.size());
@@ -434,7 +429,6 @@ int Typing::C(const std::wstring& X) const
 double Typing::Pw(const std::wstring& A, const std::wstring& B) const
 {
     int ca = C(A), cb = C(B);
-
     if (ca == 0) return 0.0;
     return double(ca)/double(cb);
 }

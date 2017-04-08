@@ -19,7 +19,8 @@ public:
 
     void Init();
     void Check();
-    double Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring>& solution) const;
+    /// return true if find solution
+    bool Solve(std::vector<std::wstring> pinyins, std::vector<std::wstring>& solution) const;
 
 private:
     const std::locale coding;

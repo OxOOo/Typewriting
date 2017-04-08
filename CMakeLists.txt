@@ -6,5 +6,5 @@ add_compile_options(-O3)
 add_compile_options(-Wall)
 add_compile_options(-g)
 
-add_executable(main src/main.cpp src/Typing.cpp)
-target_link_libraries(main pthread)
+add_executable(pinyin.exe src/main.cpp src/Typing.cpp)
+target_link_libraries(pinyin.exe pthread)
